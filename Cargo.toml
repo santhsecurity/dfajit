@@ -1,0 +1,86 @@
+[workspace]
+members = ["."]
+
+[package]
+name = "dfajit"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+authors = ["Corum Collective LLC <contact@santh.io>"]
+repository = "https://github.com/santhsecurity/dfajit"
+description = "JIT compilation of DFA transition tables to native x86_64 jump tables"
+readme = false
+keywords = ["dfa", "jit", "regex", "pattern-matching", "performance"]
+categories = ["algorithms", "text-processing"]
+
+[dependencies]
+aho-corasick = { version = "1", optional = true }
+matchkit = { version = "0.1",  path = "../../matching/matchkit"  }
+thiserror = "2"
+libc = "0.2"
+regex-automata = { version = "0.4", optional = true }
+
+[features]
+default = []
+aho-corasick = ["dep:aho-corasick"]
+regex = ["dep:regex-automata"]
+
+[dev-dependencies]
+criterion = "0.5"
+faultkit = { path = "../../testing/faultkit" }
+proptest = "1"
+rand = "0.10.0"
+rusty-fork = "0.3.1"
+
+[[bench]]
+name = "jit_bench"
+harness = false
+
+[[test]]
+name = "overflow"
+path = "tests/adversarial/overflow.rs"
+
+[[test]]
+name = "malformed"
+path = "tests/adversarial/malformed.rs"
+
+[[test]]
+name = "jit_safety"
+path = "tests/adversarial/jit_safety.rs"
+
+[[test]]
+name = "buffer_overflow"
+path = "tests/adversarial/buffer_overflow.rs"
+
+[[test]]
+name = "platform_edge_cases"
+path = "tests/adversarial/platform_edge_cases.rs"
+
+[[test]]
+name = "threads"
+path = "tests/concurrent/threads.rs"
+
+[[test]]
+name = "invariants"
+path = "tests/property/invariants.rs"
+
+[[test]]
+name = "workflow"
+path = "tests/integration/workflow.rs"
+
+[lints.clippy]
+missing_panics_doc = "allow"
+unwrap_used = "deny"
+expect_used = "deny"
+todo = "deny"
+unimplemented = "deny"
+panic = "deny"
+pedantic = { level = "warn", priority = -1 }
+
+[[test]]
+name = "regression"
+path = "tests/regression/bug_test.rs"
+[[test]]
+name = "impossible"
+path = "tests/impossible/conditions.rs"
