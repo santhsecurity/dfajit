@@ -194,7 +194,7 @@ impl TransitionTable {
             .and_then(|s| s.checked_add(accept_count.checked_mul(8)?))
             .and_then(|s| s.checked_add(4))
             .and_then(|s| s.checked_add(pat_len_count.checked_mul(4)?))
-            .unwrap_or_else(|| {
+            .unwrap_or({
                 // Pathological table: return header-only so caller doesn't crash,
                 // though deserialization will reject it.
                 8

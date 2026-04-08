@@ -146,8 +146,10 @@ impl ExecutableBuffer {
                 .get(clean_next as usize)
                 .copied()
                 .unwrap_or(0xFFFF_FFFF)
-                != 0xFFFF_FFFF
+                == 0xFFFF_FFFF
             {
+                state = clean_next;
+            } else {
                 let mut output_state = clean_next;
                 while output_state != 0xFFFF_FFFF {
                     count += 1;
@@ -158,8 +160,6 @@ impl ExecutableBuffer {
                         .unwrap_or(0xFFFF_FFFF);
                 }
                 state = 0;
-            } else {
-                state = clean_next;
             }
         }
         count
@@ -182,8 +182,10 @@ impl ExecutableBuffer {
                 .get(clean_next as usize)
                 .copied()
                 .unwrap_or(0xFFFF_FFFF)
-                != 0xFFFF_FFFF
+                == 0xFFFF_FFFF
             {
+                state = clean_next;
+            } else {
                 let mut output_state = clean_next;
                 while output_state != 0xFFFF_FFFF {
                     let pid = self.accept_pattern[output_state as usize];
@@ -205,8 +207,6 @@ impl ExecutableBuffer {
                         .unwrap_or(0xFFFF_FFFF);
                 }
                 state = 0;
-            } else {
-                state = clean_next;
             }
         }
         count.min(matches.len())
