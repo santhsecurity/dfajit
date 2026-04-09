@@ -30,6 +30,15 @@ pub enum Error {
         /// Maximum supported by JIT.
         max: usize,
     },
+
+    /// Input is longer than the x86_64 JIT scanner can index (32-bit position in the generated loop).
+    #[error("input length {len} bytes exceeds JIT limit of {max} bytes (32-bit scan index). Fix: scan in chunks of at most {max} bytes and adjust match offsets, or use a non-JIT build where the interpreted path uses `usize` positions.")]
+    InputTooLong {
+        /// Actual input length in bytes.
+        len: usize,
+        /// Maximum length the JIT implementation accepts (`u32::MAX`).
+        max: usize,
+    },
 }
 
 /// Result type alias.

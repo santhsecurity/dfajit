@@ -155,8 +155,7 @@ fn test_11_concurrent_scanning() {
 
 #[test]
 fn test_12_concurrent_has_match() {
-    let jit =
-        Arc::new(JitDfa::from_patterns(&[b"foo", b"bar"]).unwrap_or_else(|_| panic!("error")));
+    let jit = Arc::new(JitDfa::from_patterns(&[b"foo", b"bar"]).unwrap_or_else(|_| panic!("error")));
     let mut handles = vec![];
 
     for _ in 0..8 {

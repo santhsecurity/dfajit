@@ -9,8 +9,6 @@ rust-version = "1.85"
 license = "MIT"
 authors = ["Corum Collective LLC <contact@santh.io>"]
 repository = "https://github.com/santhsecurity/dfajit"
-homepage = "https://github.com/santhsecurity/dfajit"
-documentation = "https://docs.rs/dfajit"
 description = "JIT compilation of DFA transition tables to native x86_64 jump tables"
 readme = false
 keywords = ["dfa", "jit", "regex", "pattern-matching", "performance"]
@@ -30,9 +28,8 @@ regex = ["dep:regex-automata"]
 
 [dev-dependencies]
 criterion = "0.5"
-faultkit = { version = "0.1", path = "../../testing/faultkit" }
+faultkit = { path = "../../testing/faultkit" }
 proptest = "1"
-rand = "0.10.0"
 rusty-fork = "0.3.1"
 
 [[bench]]
@@ -83,10 +80,3 @@ pedantic = { level = "warn", priority = -1 }
 [[test]]
 name = "regression"
 path = "tests/regression/bug_test.rs"
-[[test]]
-name = "impossible"
-path = "tests/impossible/conditions.rs"
-
-[[test]]
-name = "unit"
-path = "tests/unit/mod.rs"

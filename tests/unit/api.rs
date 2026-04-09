@@ -1,5 +1,5 @@
-use dfajit::{JitDfa, TransitionTable};
-use matchkit::Match;
+use dfajit::{JitDfa, Match};
+use dfajit::table::TransitionTable;
 
 #[test]
 fn test_jitdfa_constructor() {
