@@ -498,4 +498,171 @@ mod tests {
         // 3 distinct targets: 0 (default), 1 (alpha), 2 (digit)
         assert_eq!(table.transition_density(0), 3);
     }
+
+    #[test]
+    fn minimize_preserves_different_pattern_ids() {
+        // States 1 and 2 are equivalent in transitions but accept different patterns.
+        // Hopcroft must NOT merge them, or compilation will fail with
+        // "multiple accept patterns".
+        let mut table = new_table(3, 256);
+        for b in 0..=255u8 {
+            table.set_transition(0, b, 0);
+            table.set_transition(1, b, 0);
+            table.set_transition(2, b, 0);
+        }
+        table.set_transition(0, b'a', 1);
+        table.set_transition(0, b'b', 2);
+        table.add_accept(1, 0);
+        table.add_accept(2, 1);
+        table.set_pattern_length(0, 1);
+        table.set_pattern_length(1, 1);
+
+        let minimized = table.minimize().unwrap_or(table.clone());
+        let jit = JitDfa::compile(&minimized).unwrap();
+
+        let mut matches = vec![Match::from_parts(0, 0, 0); 10];
+        let count = jit.scan(b"ab", &mut matches);
+        assert_eq!(count, 2);
+        assert_eq!(matches[0].pattern_id, 0);
+        assert_eq!(matches[1].pattern_id, 1);
+    }
+
+    #[test]
+    fn minimize_all_accept_same_pattern() {
+        let mut table = new_table(2, 256);
+        for b in 0..=255u8 {
+            table.set_transition(0, b, 0);
+            table.set_transition(1, b, 1);
+        }
+        table.add_accept(0, 0);
+        table.add_accept(1, 0);
+        table.set_pattern_length(0, 1);
+
+        let minimized = table.minimize().expect("should minimize");
+        assert_eq!(minimized.state_count(), 1);
+
+        let jit = JitDfa::compile(&minimized).unwrap();
+        assert_eq!(jit.scan_count(b"xxx"), 3);
+    }
+
+    #[test]
+    fn minimize_all_dead_collapses_to_one() {
+        let mut table = new_table(3, 256);
+        for state in 0..3 {
+            for b in 0..=255u8 {
+                table.set_transition(state, b, 0);
+            }
+        }
+        // No accept states
+
+        let minimized = table.minimize().expect("should minimize");
+        assert_eq!(minimized.state_count(), 1);
+
+        let jit = JitDfa::compile(&minimized).unwrap();
+        assert_eq!(jit.scan_count(b"xxx"), 0);
+    }
+
+    #[test]
+    fn minimize_single_state_accept() {
+        let mut table = new_table(1, 256);
+        for b in 0..=255u8 {
+            table.set_transition(0, b, 0);
+        }
+        table.add_accept(0, 0);
+        table.set_pattern_length(0, 1);
+
+        assert!(table.minimize().is_none());
+
+        let jit = JitDfa::compile(&table).unwrap();
+        assert_eq!(jit.scan_count(b"abc"), 3);
+    }
+
+    #[test]
+    fn serialization_round_trip_1000_patterns() {
+        let mut table = new_table(1001, 256);
+        for pid in 0..1000 {
+            let byte = (pid % 256) as u8;
+            let state = (pid + 1) as u32;
+            table.set_transition(0, byte, state);
+            table.add_accept(state, pid as u32);
+            table.set_pattern_length(pid as u32, 1);
+        }
+
+        let bytes = table.to_bytes();
+        let restored = TransitionTable::from_bytes(&bytes).unwrap();
+        assert_eq!(restored.state_count(), table.state_count());
+        assert_eq!(restored.class_count(), table.class_count());
+        assert_eq!(restored.transitions(), table.transitions());
+        assert_eq!(restored.accept_states(), table.accept_states());
+        assert_eq!(restored.pattern_lengths(), table.pattern_lengths());
+
+        let jit_orig = JitDfa::compile(&table).unwrap();
+        let jit_restored = JitDfa::compile(&restored).unwrap();
+
+        let input = vec![0u8, 1u8, 2u8, 255u8];
+        assert_eq!(
+            jit_orig.scan_count(&input),
+            jit_restored.scan_count(&input)
+        );
+    }
+
+    #[test]
+    fn jit_interpreted_parity_via_minimization() {
+        // Build a large redundant DFA (>4096 states -> interpreted fallback)
+        let mut table = new_table(5000, 256);
+        for state in 0..5000 {
+            for b in 0..=255u8 {
+                table.set_transition(state, b, 0);
+            }
+        }
+        table.set_transition(0, b'x', 1);
+        table.add_accept(1, 0);
+        table.set_pattern_length(0, 1);
+
+        let large_jit = JitDfa::compile(&table).unwrap();
+        let minimized = table.minimize().expect("should minimize redundant states");
+        assert!(minimized.state_count() <= 4096);
+
+        let small_jit = JitDfa::compile(&minimized).unwrap();
+
+        let inputs: [&[u8]; 5] = [b"", b"x", b"xx", b"abc", b"xxxxxxxxxx"];
+        for input in inputs {
+            assert_eq!(
+                large_jit.scan_count(input),
+                small_jit.scan_count(input),
+                "JIT/interpreted parity failed for input {:?}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn thread_safety_8_threads_many_patterns() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let patterns: Vec<Vec<u8>> = (0..100)
+            .map(|i| format!("p{:02}", i).into_bytes())
+            .collect();
+        let pattern_refs: Vec<&[u8]> = patterns.iter().map(|p| p.as_slice()).collect();
+
+        let jit = Arc::new(JitDfa::from_patterns(&pattern_refs).unwrap());
+
+        let mut handles = vec![];
+        for i in 0..8 {
+            let jit_clone = Arc::clone(&jit);
+            handles.push(thread::spawn(move || {
+                let input = b"p00 p01 p99 xyz";
+                let mut matches = vec![Match::from_parts(0, 0, 0); 10];
+                for _ in 0..100 {
+                    let count = jit_clone.scan(input, &mut matches);
+                    assert_eq!(count, 3, "thread {} mismatch", i);
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    }
 }

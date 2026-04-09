@@ -1,5 +1,4 @@
-use dfajit::table::TransitionTable;
-use dfajit::error::Error;
+use dfajit::{TransitionTable, Error};
 
 #[test]
 fn test_table_new() {
@@ -8,7 +7,7 @@ fn test_table_new() {
     assert_eq!(table.class_count(), 256);
     assert_eq!(table.transitions().len(), 5 * 256);
     assert!(table.accept_states().is_empty());
-    assert!(table.pattern_lengths.is_empty());
+    assert!(table.pattern_lengths().is_empty());
 }
 
 #[test]
@@ -70,9 +69,9 @@ fn test_table_serialize_roundtrip() {
     
     assert_eq!(decoded.state_count(), table.state_count());
     assert_eq!(decoded.class_count(), table.class_count());
-    assert_eq!(decoded.transitions(), table.transitions);
-    assert_eq!(decoded.accept_states(), table.accept_states);
-    assert_eq!(decoded.pattern_lengths(), table.pattern_lengths);
+    assert_eq!(decoded.transitions(), table.transitions());
+    assert_eq!(decoded.accept_states(), table.accept_states());
+    assert_eq!(decoded.pattern_lengths(), table.pattern_lengths());
 }
 
 #[test]
@@ -98,13 +97,13 @@ fn test_table_estimated_code_size() {
 #[test]
 fn test_table_transition_density() {
     let mut table = TransitionTable::new(1, 256).unwrap();
-    let mut density = table.transition_density();
-    assert_eq!(density, 0.0);
-    
+    let density = table.transition_density(0);
+    assert_eq!(density, 1); // all transitions default to target 0
+
     for i in 0..128 {
         table.set_transition(0, i as u8, 1);
     }
-    
-    density = table.transition_density();
-    assert_eq!(density, 0.5);
+
+    let density = table.transition_density(0);
+    assert_eq!(density, 2); // targets 0 and 1
 }

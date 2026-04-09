@@ -86,3 +86,7 @@ path = "tests/regression/bug_test.rs"
 [[test]]
 name = "impossible"
 path = "tests/impossible/conditions.rs"
+
+[[test]]
+name = "unit"
+path = "tests/unit/mod.rs"
