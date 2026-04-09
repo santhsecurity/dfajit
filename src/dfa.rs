@@ -177,12 +177,7 @@ impl JitDfa {
     /// Scan input bytes, appending matches to the output vector.
     ///
     /// Returns the number of new matches found.
-    ///
-    /// # Errors
-    ///
-    /// On x86_64 with JIT code, returns [`Error::InputTooLong`] if `input.len()` exceeds
-    /// `u32::MAX` (the JIT scanner uses a 32-bit byte index).
-    pub fn scan(&self, input: &[u8], matches: &mut [Match]) -> Result<usize> {
+    pub fn scan(&self, input: &[u8], matches: &mut [Match]) -> usize {
         #[cfg(target_arch = "x86_64")]
         {
             self.code.scan(input, matches)
@@ -190,7 +185,7 @@ impl JitDfa {
 
         #[cfg(not(target_arch = "x86_64"))]
         {
-            Ok(self.scan_interpreted(input, matches))
+            self.scan_interpreted(input, matches)
         }
     }
 
@@ -253,13 +248,8 @@ impl JitDfa {
     }
 
     /// Count matches without allocating a match vector.
-    ///
-    /// # Errors
-    ///
-    /// On x86_64 with JIT code, returns [`Error::InputTooLong`] if `input.len()` exceeds
-    /// `u32::MAX`. See [`Self::scan`].
     #[must_use]
-    pub fn scan_count(&self, input: &[u8]) -> Result<usize> {
+    pub fn scan_count(&self, input: &[u8]) -> usize {
         #[cfg(target_arch = "x86_64")]
         {
             self.code.scan_count(input)
@@ -267,7 +257,7 @@ impl JitDfa {
 
         #[cfg(not(target_arch = "x86_64"))]
         {
-            Ok(self.scan_count_interpreted(input))
+            self.scan_count_interpreted(input)
         }
     }
 
@@ -307,28 +297,20 @@ impl JitDfa {
     }
 
     /// Find the first match, returning immediately without scanning the rest.
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::scan`] when the input is too long for JIT.
     #[must_use]
-    pub fn scan_first(&self, input: &[u8]) -> Result<Option<Match>> {
+    pub fn scan_first(&self, input: &[u8]) -> Option<Match> {
         let mut matches = [Match::from_parts(0, 0, 0); 1];
-        if self.scan(input, &mut matches)? > 0 {
-            Ok(Some(matches[0]))
+        if self.scan(input, &mut matches) > 0 {
+            Some(matches[0])
         } else {
-            Ok(None)
+            None
         }
     }
 
     /// Check if the input contains any match at all.
-    ///
-    /// # Errors
-    ///
-    /// Same as [`Self::scan`] when the input is too long for JIT.
     #[must_use]
-    pub fn has_match(&self, input: &[u8]) -> Result<bool> {
-        Ok(self.scan_first(input)?.is_some())
+    pub fn has_match(&self, input: &[u8]) -> bool {
+        self.scan_first(input).is_some()
     }
 
     /// Build a JIT DFA from a set of literal patterns.
@@ -561,7 +543,7 @@ impl JitDfa {
                 for match_index in 0..dfa.match_len(eoi_state) {
                     let pattern_id = dfa.match_pattern(eoi_state, match_index).as_usize() as u32;
                     if !table
-                        .accept_states
+                        .accept_states()
                         .iter()
                         .any(|&(state, pid)| state == state_index as u32 && pid == pattern_id)
                     {

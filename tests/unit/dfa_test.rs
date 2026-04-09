@@ -1,6 +1,5 @@
-use dfajit::{JitDfa, Match};
-use dfajit::table::TransitionTable;
-use dfajit::error::Error;
+use dfajit::{JitDfa, TransitionTable, Error};
+use matchkit::Match;
 
 #[test]
 fn test_empty_dfa() {
@@ -11,7 +10,7 @@ fn test_empty_dfa() {
 
 #[test]
 fn test_dfa_exceeds_states() {
-    let mut table = TransitionTable::new(5000, 256).unwrap();
+    let table = TransitionTable::new(5000, 256).unwrap();
     let result = JitDfa::compile(&table);
     assert!(result.is_ok()); // Note: currently large DFA falls back to interpreted mode, does not error
 }
@@ -31,9 +30,9 @@ fn test_dfa_from_patterns_single() {
     let mut matches = vec![Match::from_parts(0, 0, 0); 10];
     let count = dfa.scan(b"xabcx", &mut matches);
     assert_eq!(count, 1);
-    assert_eq!(matches[0].pattern_id(), 0);
-    assert_eq!(matches[0].start(), 1);
-    assert_eq!(matches[0].end(), 4);
+    assert_eq!(matches[0].pattern_id, 0);
+    assert_eq!(matches[0].start, 1);
+    assert_eq!(matches[0].end, 4);
 }
 
 #[test]
@@ -44,17 +43,17 @@ fn test_dfa_from_patterns_multiple() {
     let mut matches = vec![Match::from_parts(0, 0, 0); 10];
     let count = dfa.scan(b"xabcyz", &mut matches);
     assert_eq!(count, 3);
-    assert_eq!(matches[0].pattern_id(), 1); // x
-    assert_eq!(matches[0].start(), 0);
-    assert_eq!(matches[0].end(), 1);
-    
-    assert_eq!(matches[1].pattern_id(), 0); // abc
-    assert_eq!(matches[1].start(), 1);
-    assert_eq!(matches[1].end(), 4);
-    
-    assert_eq!(matches[2].pattern_id(), 2); // yz
-    assert_eq!(matches[2].start(), 4);
-    assert_eq!(matches[2].end(), 6);
+    assert_eq!(matches[0].pattern_id, 1); // x
+    assert_eq!(matches[0].start, 0);
+    assert_eq!(matches[0].end, 1);
+
+    assert_eq!(matches[1].pattern_id, 0); // abc
+    assert_eq!(matches[1].start, 1);
+    assert_eq!(matches[1].end, 4);
+
+    assert_eq!(matches[2].pattern_id, 2); // yz
+    assert_eq!(matches[2].start, 4);
+    assert_eq!(matches[2].end, 6);
 }
 
 #[test]

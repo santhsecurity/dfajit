@@ -72,23 +72,13 @@ impl Drop for ExecutableBuffer {
 
 #[cfg(target_arch = "x86_64")]
 impl ExecutableBuffer {
+    /// Scan input bytes, appending matches to the output vector.
     /// Scan input bytes, placing matches directly into the output slice.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::InputTooLong`] when `self.is_jit` and `input.len()` exceeds
-    /// `u32::MAX` (the JIT loop uses a 32-bit position counter).
-    pub fn scan(&self, input: &[u8], matches: &mut [Match]) -> Result<usize> {
-        if self.is_jit && input.len() > u32::MAX as usize {
-            return Err(Error::InputTooLong {
-                len: input.len(),
-                max: u32::MAX as usize,
-            });
-        }
+    pub fn scan(&self, input: &[u8], matches: &mut [Match]) -> usize {
         if self.is_jit {
-            Ok(self.scan_jit(input, matches))
+            self.scan_jit(input, matches)
         } else {
-            Ok(self.scan_interpreted(input, matches))
+            self.scan_interpreted(input, matches)
         }
     }
 
@@ -122,21 +112,11 @@ impl ExecutableBuffer {
         (count as usize).min(max_matches)
     }
 
-    /// # Errors
-    ///
-    /// Returns [`Error::InputTooLong`] when `self.is_jit` and `input.len()` exceeds
-    /// `u32::MAX`. See [`Self::scan`].
-    pub fn scan_count(&self, input: &[u8]) -> Result<usize> {
-        if self.is_jit && input.len() > u32::MAX as usize {
-            return Err(Error::InputTooLong {
-                len: input.len(),
-                max: u32::MAX as usize,
-            });
-        }
+    pub fn scan_count(&self, input: &[u8]) -> usize {
         if self.is_jit {
-            Ok(self.scan_count_jit(input))
+            self.scan_count_jit(input)
         } else {
-            Ok(self.scan_count_interpreted(input))
+            self.scan_count_interpreted(input)
         }
     }
 
@@ -166,8 +146,10 @@ impl ExecutableBuffer {
                 .get(clean_next as usize)
                 .copied()
                 .unwrap_or(0xFFFF_FFFF)
-                != 0xFFFF_FFFF
+                == 0xFFFF_FFFF
             {
+                state = clean_next;
+            } else {
                 let mut output_state = clean_next;
                 while output_state != 0xFFFF_FFFF {
                     count += 1;
@@ -178,8 +160,6 @@ impl ExecutableBuffer {
                         .unwrap_or(0xFFFF_FFFF);
                 }
                 state = 0;
-            } else {
-                state = clean_next;
             }
         }
         count
@@ -202,8 +182,10 @@ impl ExecutableBuffer {
                 .get(clean_next as usize)
                 .copied()
                 .unwrap_or(0xFFFF_FFFF)
-                != 0xFFFF_FFFF
+                == 0xFFFF_FFFF
             {
+                state = clean_next;
+            } else {
                 let mut output_state = clean_next;
                 while output_state != 0xFFFF_FFFF {
                     let pid = self.accept_pattern[output_state as usize];
@@ -225,8 +207,6 @@ impl ExecutableBuffer {
                         .unwrap_or(0xFFFF_FFFF);
                 }
                 state = 0;
-            } else {
-                state = clean_next;
             }
         }
         count.min(matches.len())

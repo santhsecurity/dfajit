@@ -76,13 +76,7 @@ impl TransitionTable {
     /// Panics in debug mode if the state/byte combination is out of bounds.
     /// In release mode, out-of-bounds writes are silently ignored.
     pub fn set_transition(&mut self, state: usize, byte: u8, next_state: u32) {
-        let Some(idx) = state
-            .checked_mul(self.class_count)
-            .and_then(|base| base.checked_add(byte as usize))
-        else {
-            // Same as out-of-bounds: release builds ignore invalid writes (no wrapping index).
-            return;
-        };
+        let idx = state * self.class_count + byte as usize;
         debug_assert!(
             idx < self.transitions.len(),
             "set_transition out of bounds: state={state}, byte={byte}, idx={idx}, len={}",
@@ -200,7 +194,7 @@ impl TransitionTable {
             .and_then(|s| s.checked_add(accept_count.checked_mul(8)?))
             .and_then(|s| s.checked_add(4))
             .and_then(|s| s.checked_add(pat_len_count.checked_mul(4)?))
-            .unwrap_or_else(|| {
+            .unwrap_or({
                 // Pathological table: return header-only so caller doesn't crash,
                 // though deserialization will reject it.
                 8
@@ -483,10 +477,11 @@ impl TransitionTable {
     /// Whether this DFA is small enough for JIT compilation.
     ///
     /// Returns `false` if the DFA would exceed the I-cache safety fuse
-    /// and fall back to interpreted execution.
+    /// and fall back to interpreted execution, or if the class count is not
+    /// 256 (the JIT only supports byte-indexed tables).
     #[must_use]
     pub fn is_jit_eligible(&self) -> bool {
-        self.state_count <= 4096
+        self.state_count <= 4096 && self.class_count == 256
     }
 
     /// Minimize the DFA using Hopcroft's partition refinement algorithm.
@@ -505,17 +500,30 @@ impl TransitionTable {
             return None;
         }
 
-        let accept_set: std::collections::HashSet<u32> =
-            self.accept_states.iter().map(|&(s, _)| s).collect();
+        // Build state -> pattern_id map for accept states.
+        let mut state_to_pattern: std::collections::HashMap<u32, u32> =
+            std::collections::HashMap::new();
+        for &(s, pid) in &self.accept_states {
+            state_to_pattern.insert(s, pid);
+        }
 
-        // Initial partition: accept states vs non-accept states
+        // Initial partition: group accept states by pattern_id.
+        // Non-accept states remain in class 0.
         let mut partition = vec![0u32; self.state_count];
+        let mut next_class = 1u32;
+        let mut pattern_class: std::collections::HashMap<u32, u32> =
+            std::collections::HashMap::new();
         for i in 0..self.state_count {
-            if accept_set.contains(&(i as u32)) {
-                partition[i] = 1;
+            if let Some(&pid) = state_to_pattern.get(&(i as u32)) {
+                let class = *pattern_class.entry(pid).or_insert_with(|| {
+                    let c = next_class;
+                    next_class += 1;
+                    c
+                });
+                partition[i] = class;
             }
         }
-        let mut num_classes = 2u32;
+        let mut num_classes = next_class;
 
         // Iteratively refine partitions
         let mut changed = true;
