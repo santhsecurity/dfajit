@@ -543,7 +543,7 @@ impl JitDfa {
                 for match_index in 0..dfa.match_len(eoi_state) {
                     let pattern_id = dfa.match_pattern(eoi_state, match_index).as_usize() as u32;
                     if !table
-                        .accept_states
+                        .accept_states()
                         .iter()
                         .any(|&(state, pid)| state == state_index as u32 && pid == pattern_id)
                     {
